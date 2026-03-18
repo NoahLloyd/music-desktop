@@ -15,6 +15,26 @@
     "dotenv": "^17.3.1",
     "zustand": "^5.0.3"
   },
+  "build": {
+    "appId": "com.daegu.music",
+    "productName": "Music",
+    "mac": {
+      "category": "public.app-category.music",
+      "target": "dmg"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    }
+  },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",

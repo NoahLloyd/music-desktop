@@ -55,6 +55,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       audioElement.addEventListener('ended', () => {
         get().next()
       })
+
+      // Set up Media Session handlers for OS media keys (F7/F8/F9)
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => get().resume())
+        navigator.mediaSession.setActionHandler('pause', () => get().pause())
+        navigator.mediaSession.setActionHandler('previoustrack', () => get().previous())
+        navigator.mediaSession.setActionHandler('nexttrack', () => get().next())
+      }
     }
     return audioElement
   }
@@ -83,6 +91,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       audio.currentTime = track.start_time
     }
     set({ isPlaying: true })
+
+    // Update Media Session metadata so OS knows what's playing
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist || 'Unknown',
+        ...(track.artwork_url ? { artwork: [{ src: track.artwork_url }] } : {})
+      })
+    }
   }
 
   return {

@@ -31,8 +31,6 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
   const [showEditor, setShowEditor] = useState(false)
 
   const isCurrent = currentTrack?.id === track.id
-  const isTrimmed = track.start_time != null || track.end_time != null
-
   return (
     <>
       <div
@@ -68,11 +66,6 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
             <p className={`text-sm truncate ${isCurrent ? 'text-accent' : 'text-white'}`}>
               {track.title}
             </p>
-            {isTrimmed && (
-              <span className="text-[10px] text-accent/60 bg-accent/10 px-1 rounded flex-shrink-0">
-                trimmed
-              </span>
-            )}
           </div>
           <p className="text-xs text-white/40 truncate">{track.artist || 'Unknown'}</p>
         </div>
