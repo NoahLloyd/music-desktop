@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { mkdir, writeFile, access } from 'fs/promises'
+import { mkdir, writeFile, access, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 
 let cachePath: string
@@ -12,8 +12,20 @@ export function getCachePath(): string {
   return cachePath
 }
 
-export function getCachedFilePath(trackId: string): string {
-  return join(getCachePath(), `${trackId}.mp3`)
+export function getCachedFilePath(trackId: string, ext?: string): string {
+  return join(getCachePath(), `${trackId}${ext || '.audio'}`)
+}
+
+export async function findCachedFile(trackId: string): Promise<string | null> {
+  const dir = getCachePath()
+  if (!existsSync(dir)) return null
+  try {
+    const files = await readdir(dir)
+    const match = files.find((f) => f.startsWith(trackId + '.'))
+    return match ? join(dir, match) : null
+  } catch {
+    return null
+  }
 }
 
 export async function ensureCacheDir(): Promise<void> {
@@ -24,12 +36,7 @@ export async function ensureCacheDir(): Promise<void> {
 }
 
 export async function isCached(trackId: string): Promise<boolean> {
-  try {
-    await access(getCachedFilePath(trackId))
-    return true
-  } catch {
-    return false
-  }
+  return (await findCachedFile(trackId)) !== null
 }
 
 export async function cacheFileFromBuffer(trackId: string, buffer: Buffer): Promise<void> {

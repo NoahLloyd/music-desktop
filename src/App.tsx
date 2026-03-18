@@ -83,6 +83,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+
   return (
     <>
       <div className="flex flex-col h-screen bg-surface-0">
@@ -95,7 +96,7 @@ export default function App() {
           />
           <div className="flex-1 flex flex-col min-h-0">
             <div className="drag-region h-10 flex-shrink-0" />
-            <main className="flex-1 overflow-y-auto px-6 pb-6">
+            <main className="flex-1 overflow-y-auto px-6 pt-2 pb-6">
               {view === 'library' && <Library searchRef={searchRef} />}
               {view === 'playlist' && selectedPlaylistId && (
                 <PlaylistView playlistId={selectedPlaylistId} />

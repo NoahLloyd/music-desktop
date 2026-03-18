@@ -3,7 +3,7 @@ import { join, basename, extname } from 'path'
 import { copyFile, readFile, unlink } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { downloadAudio, getYtDlpPath } from './downloader'
-import { getCachePath, getCachedFilePath, ensureCacheDir } from './cache'
+import { getCachePath, getCachedFilePath, findCachedFile, ensureCacheDir } from './cache'
 import { uploadAudioFile, insertTrack } from './supabase'
 import { config } from 'dotenv'
 
@@ -67,8 +67,9 @@ app.whenReady().then(() => {
         message: 'Uploading to cloud...'
       })
 
-      // Upload to Supabase Storage
-      const fileName = `${Date.now()}-${result.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)}.mp3`
+      // Upload to Supabase Storage (preserve original extension from yt-dlp)
+      const dlExt = extname(result.filePath) || '.opus'
+      const fileName = `${Date.now()}-${result.title.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)}${dlExt}`
       const storagePath = await uploadAudioFile(fileName, result.filePath)
 
       // Insert track into DB
@@ -83,9 +84,9 @@ app.whenReady().then(() => {
         end_time: null
       })
 
-      // Cache locally
+      // Cache locally (preserve original extension)
       await ensureCacheDir()
-      await copyFile(result.filePath, getCachedFilePath(track.id))
+      await copyFile(result.filePath, getCachedFilePath(track.id, dlExt))
 
       // Clean up temp file
       await unlink(result.filePath).catch(() => {})
@@ -167,15 +168,15 @@ app.whenReady().then(() => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Audio', extensions: ['mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac', 'wma'] }
+        { name: 'Audio', extensions: ['mp3', 'm4a', 'wav', 'flac', 'ogg', 'opus', 'webm', 'aac', 'wma'] }
       ]
     })
     return result.canceled ? [] : result.filePaths
   })
 
-  // IPC: Get local cache path for a track
+  // IPC: Get local cache path for a track (finds whatever extension is cached)
   ipcMain.handle('get-cache-path', async (_event, trackId: string) => {
-    return getCachedFilePath(trackId)
+    return await findCachedFile(trackId) || getCachedFilePath(trackId)
   })
 
   // IPC: Check if yt-dlp is available

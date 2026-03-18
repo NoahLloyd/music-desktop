@@ -10,6 +10,8 @@ const MIME_MAP: Record<string, string> = {
   '.wav': 'audio/wav',
   '.flac': 'audio/flac',
   '.ogg': 'audio/ogg',
+  '.opus': 'audio/opus',
+  '.webm': 'audio/webm',
   '.aac': 'audio/aac',
   '.wma': 'audio/x-ms-wma'
 }

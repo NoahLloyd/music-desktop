@@ -67,8 +67,6 @@ export async function downloadAudio(
 
     const proc = spawn(ytDlpPath, [
       '-x',
-      '--audio-format', 'mp3',
-      '--audio-quality', '0',
       '-o', outputTemplate,
       '--no-playlist',
       '--newline',
@@ -95,7 +93,7 @@ export async function downloadAudio(
       const text = data.toString()
       stderrOutput += text
       if (text.includes('Extracting') || text.includes('Converting')) {
-        onProgress({ percent: 95, stage: 'converting', message: 'Converting to MP3...' })
+        onProgress({ percent: 95, stage: 'converting', message: 'Processing audio...' })
       }
     })
 
@@ -103,10 +101,13 @@ export async function downloadAudio(
       if (code === 0 && lastLine && existsSync(lastLine)) {
         resolve(lastLine)
       } else if (code === 0) {
-        // Fallback: find the file by the temp base name
-        const mp3Path = `${tempBase}.mp3`
-        if (existsSync(mp3Path)) {
-          resolve(mp3Path)
+        // Fallback: find the file by the temp base name (could be any audio extension)
+        const { readdirSync } = require('fs')
+        const tempDir = require('path').dirname(tempBase)
+        const baseName = require('path').basename(tempBase)
+        const match = readdirSync(tempDir).find((f: string) => f.startsWith(baseName))
+        if (match) {
+          resolve(join(tempDir, match))
         } else {
           reject(new Error(`Download completed but output file not found. Last output: ${lastLine}`))
         }
