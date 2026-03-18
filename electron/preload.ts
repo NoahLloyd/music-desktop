@@ -30,6 +30,8 @@ const api = {
     ipcRenderer.on('import-progress', handler)
     return () => ipcRenderer.removeListener('import-progress', handler)
   },
+  // Delete cached file for a track
+  deleteCache: (trackId: string) => ipcRenderer.invoke('delete-cache', trackId),
   // Get cache directory
   getCacheDir: () => ipcRenderer.invoke('get-cache-dir'),
   // Get real file path from a dropped File object

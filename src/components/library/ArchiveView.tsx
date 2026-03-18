@@ -1,43 +1,31 @@
-import { useMemo, useState, useEffect, useCallback, RefObject } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useLibraryStore } from '@/stores/libraryStore'
 import { usePlayerStore } from '@/stores/playerStore'
 import TrackRow from '@/components/ui/TrackRow'
 import TrackEditor from '@/components/ui/TrackEditor'
 
-interface LibraryProps {
-  searchRef: RefObject<HTMLInputElement | null>
-}
-
-export default function Library({ searchRef }: LibraryProps) {
-  const tracks = useLibraryStore((s) => s.tracks)
-  const searchQuery = useLibraryStore((s) => s.searchQuery)
-  const setSearchQuery = useLibraryStore((s) => s.setSearchQuery)
-  const archiveTrack = useLibraryStore((s) => s.archiveTrack)
+export default function ArchiveView() {
+  const archivedTracks = useLibraryStore((s) => s.archivedTracks)
+  const fetchArchivedTracks = useLibraryStore((s) => s.fetchArchivedTracks)
+  const unarchiveTrack = useLibraryStore((s) => s.unarchiveTrack)
   const deleteTrack = useLibraryStore((s) => s.deleteTrack)
   const setQueue = usePlayerStore((s) => s.setQueue)
 
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null)
 
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return tracks
-    const q = searchQuery.toLowerCase()
-    return tracks.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        (t.artist && t.artist.toLowerCase().includes(q))
-    )
-  }, [tracks, searchQuery])
-
-  // Reset selection when filter changes
   useEffect(() => {
-    setSelectedIndex((prev) => (prev >= filtered.length ? filtered.length - 1 : prev))
-  }, [filtered.length])
+    fetchArchivedTracks()
+  }, [])
 
-  const selectedTrack = selectedIndex >= 0 && selectedIndex < filtered.length ? filtered[selectedIndex] : null
+  useEffect(() => {
+    setSelectedIndex((prev) => (prev >= archivedTracks.length ? archivedTracks.length - 1 : prev))
+  }, [archivedTracks.length])
+
+  const selectedTrack = selectedIndex >= 0 && selectedIndex < archivedTracks.length ? archivedTracks[selectedIndex] : null
 
   const handlePlay = (index: number) => {
-    setQueue(filtered, index)
+    setQueue(archivedTracks, index)
   }
 
   const handleKeyDown = useCallback(
@@ -45,10 +33,9 @@ export default function Library({ searchRef }: LibraryProps) {
       const target = e.target as HTMLElement
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
-      // Allow arrow keys even in search (to navigate results), but not other shortcuts
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1))
+        setSelectedIndex((prev) => Math.min(prev + 1, archivedTracks.length - 1))
         return
       }
       if (e.key === 'ArrowUp') {
@@ -71,7 +58,7 @@ export default function Library({ searchRef }: LibraryProps) {
           break
         case 'a':
           e.preventDefault()
-          archiveTrack(selectedTrack.id)
+          unarchiveTrack(selectedTrack.id)
           break
         case 'Backspace':
         case 'Delete':
@@ -82,7 +69,7 @@ export default function Library({ searchRef }: LibraryProps) {
           break
       }
     },
-    [filtered, selectedIndex, selectedTrack]
+    [archivedTracks, selectedIndex, selectedTrack]
   )
 
   useEffect(() => {
@@ -90,7 +77,6 @@ export default function Library({ searchRef }: LibraryProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Scroll selected row into view
   useEffect(() => {
     if (selectedIndex >= 0) {
       const el = document.querySelector(`[data-track-index="${selectedIndex}"]`)
@@ -101,30 +87,24 @@ export default function Library({ searchRef }: LibraryProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Library</h1>
-        <input
-          ref={searchRef}
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search tracks..."
-          className="bg-surface-2 text-white text-sm rounded-full px-4 py-2 w-64 outline-none focus:ring-1 focus:ring-accent placeholder:text-white/30"
-        />
+        <h1 className="text-2xl font-bold">Archive</h1>
+        <span className="text-sm text-white/30">{archivedTracks.length} tracks</span>
       </div>
 
-      {filtered.length === 0 ? (
+      {archivedTracks.length === 0 ? (
         <div className="text-center text-white/30 mt-20">
-          <p className="text-lg mb-2">No tracks yet</p>
-          <p className="text-sm">Download some music to get started</p>
+          <p className="text-lg mb-2">No archived tracks</p>
+          <p className="text-sm">Archived tracks will appear here. They won't show in your library or search.</p>
         </div>
       ) : (
         <div className="space-y-0.5">
-          {filtered.map((track, i) => (
+          {archivedTracks.map((track, i) => (
             <div key={track.id} data-track-index={i}>
               <TrackRow
                 track={track}
                 index={i}
                 onPlay={() => handlePlay(i)}
+                isArchived
                 selected={i === selectedIndex}
                 onSelect={() => setSelectedIndex(i)}
                 onEdit={() => setEditingTrackId(track.id)}
@@ -136,7 +116,7 @@ export default function Library({ searchRef }: LibraryProps) {
 
       {editingTrackId && (
         <TrackEditor
-          track={filtered.find((t) => t.id === editingTrackId) || tracks.find((t) => t.id === editingTrackId)!}
+          track={archivedTracks.find((t) => t.id === editingTrackId)!}
           onClose={() => setEditingTrackId(null)}
         />
       )}

@@ -3,7 +3,7 @@ import { useLibraryStore } from '@/stores/libraryStore'
 
 interface SidebarProps {
   currentView: string
-  onNavigate: (view: 'library' | 'download' | 'queue') => void
+  onNavigate: (view: 'library' | 'artists' | 'download' | 'queue' | 'archive') => void
   onPlaylistSelect: (id: string) => void
   selectedPlaylistId: string | null
 }
@@ -43,6 +43,12 @@ export default function Sidebar({
           onClick={() => onNavigate('library')}
         />
         <NavItem
+          icon="◎"
+          label="Artists"
+          active={currentView === 'artists'}
+          onClick={() => onNavigate('artists')}
+        />
+        <NavItem
           icon="↓"
           label="Add Music"
           active={currentView === 'download'}
@@ -53,6 +59,12 @@ export default function Sidebar({
           label="Queue"
           active={currentView === 'queue'}
           onClick={() => onNavigate('queue')}
+        />
+        <NavItem
+          icon="▫"
+          label="Archive"
+          active={currentView === 'archive'}
+          onClick={() => onNavigate('archive')}
         />
       </nav>
 

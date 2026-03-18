@@ -4,15 +4,19 @@ import { supabase } from '@/lib/supabase'
 
 interface LibraryState {
   tracks: Track[]
+  archivedTracks: Track[]
   playlists: Playlist[]
   loading: boolean
   searchQuery: string
   lastError: string | null
 
   fetchTracks: () => Promise<void>
+  fetchArchivedTracks: () => Promise<void>
   fetchPlaylists: () => Promise<void>
   updateTrack: (id: string, updates: Partial<Track>) => Promise<void>
   deleteTrack: (id: string) => Promise<void>
+  archiveTrack: (id: string) => Promise<void>
+  unarchiveTrack: (id: string) => Promise<void>
   createPlaylist: (name: string) => Promise<Playlist>
   deletePlaylist: (id: string) => Promise<void>
   renamePlaylist: (id: string, name: string) => Promise<void>
@@ -26,6 +30,7 @@ interface LibraryState {
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   tracks: [],
+  archivedTracks: [],
   playlists: [],
   loading: false,
   searchQuery: '',
@@ -35,8 +40,18 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     const { data, error } = await supabase
       .from('tracks')
       .select('*')
+      .is('archived_at', null)
       .order('created_at', { ascending: false })
     if (!error && data) set({ tracks: data })
+  },
+
+  fetchArchivedTracks: async () => {
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false })
+    if (!error && data) set({ archivedTracks: data })
   },
 
   fetchPlaylists: async () => {
@@ -57,7 +72,47 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   deleteTrack: async (id) => {
     await supabase.from('tracks').delete().eq('id', id)
-    set((state) => ({ tracks: state.tracks.filter((t) => t.id !== id) }))
+    set((state) => ({
+      tracks: state.tracks.filter((t) => t.id !== id),
+      archivedTracks: state.archivedTracks.filter((t) => t.id !== id)
+    }))
+  },
+
+  archiveTrack: async (id) => {
+    const archivedAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('tracks')
+      .update({ archived_at: archivedAt })
+      .eq('id', id)
+    if (error) throw error
+    // Remove from cache
+    await window.api.deleteCache(id)
+    set((state) => {
+      const track = state.tracks.find((t) => t.id === id)
+      return {
+        tracks: state.tracks.filter((t) => t.id !== id),
+        archivedTracks: track
+          ? [{ ...track, archived_at: archivedAt }, ...state.archivedTracks]
+          : state.archivedTracks
+      }
+    })
+  },
+
+  unarchiveTrack: async (id) => {
+    const { error } = await supabase
+      .from('tracks')
+      .update({ archived_at: null })
+      .eq('id', id)
+    if (error) throw error
+    set((state) => {
+      const track = state.archivedTracks.find((t) => t.id === id)
+      return {
+        archivedTracks: state.archivedTracks.filter((t) => t.id !== id),
+        tracks: track
+          ? [{ ...track, archived_at: null }, ...state.tracks]
+          : state.tracks
+      }
+    })
   },
 
   createPlaylist: async (name) => {

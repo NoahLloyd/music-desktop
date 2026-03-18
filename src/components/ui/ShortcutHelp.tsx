@@ -11,13 +11,25 @@ const shortcuts = [
   ]],
   ['Navigation', [
     ['1', 'Library'],
-    ['2', 'Add Music'],
-    ['3', 'Queue'],
+    ['2', 'Artists'],
+    ['3', 'Add Music'],
+    ['4', 'Queue'],
+    ['5', 'Archive'],
     ['s', 'Search'],
+  ]],
+  ['Track Selection', [
+    ['↑ / ↓', 'Select track'],
+    ['Enter', 'Play selected'],
+    ['e', 'Edit selected'],
+    ['a', 'Archive / unarchive'],
+    ['⌘ Delete', 'Delete selected'],
+  ]],
+  ['Editor', [
+    ['⌘ Enter', 'Save changes'],
+    ['esc', 'Cancel / close'],
   ]],
   ['Other', [
     ['?', 'This menu'],
-    ['esc', 'Close / cancel'],
   ]],
 ] as const
 

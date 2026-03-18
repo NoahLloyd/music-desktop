@@ -7,9 +7,11 @@ import Library from '@/components/library/Library'
 import PlaylistView from '@/components/playlist/PlaylistView'
 import DownloadView from '@/components/download/DownloadView'
 import QueueView from '@/components/queue/QueueView'
+import ArtistsView from '@/components/library/ArtistsView'
+import ArchiveView from '@/components/library/ArchiveView'
 import ShortcutHelp from '@/components/ui/ShortcutHelp'
 
-type View = 'library' | 'playlist' | 'download' | 'queue'
+type View = 'library' | 'artists' | 'playlist' | 'download' | 'queue' | 'archive'
 
 export default function App() {
   const [view, setView] = useState<View>('library')
@@ -62,10 +64,16 @@ export default function App() {
         setView('library')
         break
       case '2':
-        setView('download')
+        setView('artists')
         break
       case '3':
+        setView('download')
+        break
+      case '4':
         setView('queue')
+        break
+      case '5':
+        setView('archive')
         break
       case 's':
         e.preventDefault()
@@ -98,11 +106,13 @@ export default function App() {
             <div className="drag-region h-10 flex-shrink-0" />
             <main className="flex-1 overflow-y-auto px-6 pt-2 pb-6">
               {view === 'library' && <Library searchRef={searchRef} />}
+              {view === 'artists' && <ArtistsView />}
               {view === 'playlist' && selectedPlaylistId && (
                 <PlaylistView playlistId={selectedPlaylistId} />
               )}
               {view === 'download' && <DownloadView />}
               {view === 'queue' && <QueueView />}
+              {view === 'archive' && <ArchiveView />}
             </main>
           </div>
         </div>
