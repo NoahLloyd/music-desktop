@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+.env
+.env.local
+*.mp3
+*.m4a
+.DS_Store
+.context/
