@@ -9,6 +9,7 @@ import { config } from 'dotenv'
 
 // Load .env so process.env has VITE_SUPABASE_URL etc.
 // Try multiple locations since app path differs between dev and packaged
+config({ path: join(process.resourcesPath, '.env') })
 config({ path: join(app.getAppPath(), '.env') })
 config({ path: join(process.cwd(), '.env') })
 
@@ -187,6 +188,16 @@ app.whenReady().then(() => {
     } catch {
       return { available: false, path: null }
     }
+  })
+
+  // IPC: Delete cached file for a track
+  ipcMain.handle('delete-cache', async (_event, trackId: string) => {
+    const cached = await findCachedFile(trackId)
+    if (cached) {
+      await unlink(cached).catch(() => {})
+      return true
+    }
+    return false
   })
 
   // IPC: Get app cache directory

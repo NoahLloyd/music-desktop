@@ -40,13 +40,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           get().next()
           return
         }
-        set({ progress: currentTime })
+        // Fade-out: ramp volume down approaching end
+        const fadeOut = track?.fade_out ?? 0
+        if (fadeOut > 0 && track) {
+          const effectiveEnd = track.end_time ?? audioElement!.duration
+          const fadeStart = effectiveEnd - fadeOut
+          if (currentTime >= fadeStart && currentTime < effectiveEnd) {
+            const globalVolume = get().volume
+            const trackVolume = track.volume ?? 1
+            const targetVolume = globalVolume * Math.min(trackVolume, 2)
+            const fadeProgress = (effectiveEnd - currentTime) / fadeOut
+            audioElement!.volume = targetVolume * Math.max(fadeProgress, 0)
+          }
+        }
+        const startOffset = track?.start_time ?? 0
+        set({ progress: currentTime - startOffset })
       })
       audioElement.addEventListener('loadedmetadata', () => {
         const track = get().currentTrack
-        // Use end_time as effective duration if set
-        const effectiveDuration = track?.end_time || audioElement!.duration
-        set({ duration: effectiveDuration })
+        const startOffset = track?.start_time ?? 0
+        const effectiveEnd = track?.end_time || audioElement!.duration
+        set({ duration: effectiveEnd - startOffset })
         // Seek to start_time if set
         if (track?.start_time && audioElement!.currentTime < track.start_time) {
           audioElement!.currentTime = track.start_time
@@ -67,8 +81,45 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     return audioElement
   }
 
+  // Apply per-track audio settings (volume, speed, pitch preservation)
+  function applyTrackSettings(track: Track) {
+    if (!audioElement) return
+    const globalVolume = get().volume
+    const trackVolume = track.volume ?? 1
+    audioElement.volume = globalVolume * Math.min(trackVolume, 2)
+    audioElement.playbackRate = track.playback_speed ?? 1
+    // preservesPitch is supported in Chromium/Electron
+    ;(audioElement as any).preservesPitch = track.preserve_pitch ?? true
+  }
+
+  // Fade-in effect using volume ramping
+  let fadeInterval: ReturnType<typeof setInterval> | null = null
+  function startFadeIn(track: Track) {
+    const fadeIn = track.fade_in ?? 0
+    if (fadeIn <= 0 || !audioElement) return
+    const globalVolume = get().volume
+    const trackVolume = track.volume ?? 1
+    const targetVolume = globalVolume * Math.min(trackVolume, 2)
+    audioElement.volume = 0
+    const steps = Math.max(fadeIn * 20, 1) // 20 steps per second
+    const stepDuration = (fadeIn * 1000) / steps
+    let step = 0
+    if (fadeInterval) clearInterval(fadeInterval)
+    fadeInterval = setInterval(() => {
+      step++
+      if (!audioElement || step >= steps) {
+        if (audioElement) audioElement.volume = targetVolume
+        if (fadeInterval) clearInterval(fadeInterval)
+        fadeInterval = null
+        return
+      }
+      audioElement.volume = targetVolume * (step / steps)
+    }, stepDuration)
+  }
+
   async function loadAndPlay(track: Track): Promise<void> {
     const audio = getOrCreateAudio()
+    if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null }
     set({ currentTrack: track, isPlaying: false })
 
     try {
@@ -90,6 +141,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     if (track.start_time) {
       audio.currentTime = track.start_time
     }
+
+    // Apply per-track settings
+    applyTrackSettings(track)
+    startFadeIn(track)
+
     set({ isPlaying: true })
 
     // Update Media Session metadata so OS knows what's playing
@@ -163,11 +219,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     seek: (time) => {
-      if (audioElement) audioElement.currentTime = time
+      if (audioElement) {
+        const startOffset = get().currentTrack?.start_time ?? 0
+        audioElement.currentTime = time + startOffset
+      }
     },
 
     setVolume: (volume) => {
-      if (audioElement) audioElement.volume = volume
+      const track = get().currentTrack
+      const trackVolume = track?.volume ?? 1
+      if (audioElement) audioElement.volume = volume * Math.min(trackVolume, 2)
       set({ volume })
     },
 

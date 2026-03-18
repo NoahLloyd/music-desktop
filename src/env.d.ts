@@ -15,6 +15,7 @@ interface Window {
     getCachePath: (trackId: string) => Promise<string>
     checkYtDlp: () => Promise<{ available: boolean; path: string | null }>
     onImportProgress: (callback: (progress: { current: number; total: number; name: string; stage: string }) => void) => () => void
+    deleteCache: (trackId: string) => Promise<boolean>
     getCacheDir: () => Promise<string>
     getPathForFile: (file: File) => string
   }

@@ -1,4 +1,5 @@
 import { usePlayerStore } from '@/stores/playerStore'
+import ArtworkImage from '@/components/ui/ArtworkImage'
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds)) return '0:00'
@@ -33,10 +34,9 @@ export default function PlayerBar({ onQueueClick }: PlayerBarProps) {
         {currentTrack ? (
           <>
             {currentTrack.artwork_url ? (
-              <img
+              <ArtworkImage
                 src={currentTrack.artwork_url}
-                alt=""
-                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                className="w-10 h-10 rounded flex-shrink-0"
               />
             ) : (
               <div className="w-10 h-10 rounded bg-surface-3 flex items-center justify-center flex-shrink-0">

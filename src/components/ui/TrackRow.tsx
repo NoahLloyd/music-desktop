@@ -3,12 +3,17 @@ import { Track } from '@/types'
 import { usePlayerStore } from '@/stores/playerStore'
 import { useLibraryStore } from '@/stores/libraryStore'
 import TrackEditor from './TrackEditor'
+import ArtworkImage from './ArtworkImage'
 
 interface TrackRowProps {
   track: Track
   index: number
   onPlay: () => void
   onRemove?: () => void
+  isArchived?: boolean
+  selected?: boolean
+  onSelect?: () => void
+  onEdit?: () => void
 }
 
 function formatDuration(seconds: number | null, start?: number | null, end?: number | null): string {
@@ -19,7 +24,7 @@ function formatDuration(seconds: number | null, start?: number | null, end?: num
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowProps) {
+export default function TrackRow({ track, index, onPlay, onRemove, isArchived, selected, onSelect, onEdit }: TrackRowProps) {
   const currentTrack = usePlayerStore((s) => s.currentTrack)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
@@ -27,16 +32,25 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
   const playlists = useLibraryStore((s) => s.playlists)
   const addTrackToPlaylist = useLibraryStore((s) => s.addTrackToPlaylist)
   const deleteTrack = useLibraryStore((s) => s.deleteTrack)
+  const archiveTrack = useLibraryStore((s) => s.archiveTrack)
+  const unarchiveTrack = useLibraryStore((s) => s.unarchiveTrack)
   const [showMenu, setShowMenu] = useState(false)
-  const [showEditor, setShowEditor] = useState(false)
+  // Fallback editor state for when no parent onEdit is provided (e.g. PlaylistView)
+  const [showFallbackEditor, setShowFallbackEditor] = useState(false)
+
+  const openEditor = () => {
+    if (onEdit) onEdit()
+    else setShowFallbackEditor(true)
+  }
 
   const isCurrent = currentTrack?.id === track.id
   return (
     <>
       <div
         className={`group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors cursor-pointer ${
-          isCurrent ? 'bg-surface-2' : ''
+          selected ? 'bg-surface-2 ring-1 ring-accent/30' : isCurrent ? 'bg-surface-2' : ''
         }`}
+        onClick={onSelect}
         onDoubleClick={onPlay}
         onContextMenu={(e) => {
           e.preventDefault()
@@ -54,7 +68,7 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
         </button>
 
         {track.artwork_url ? (
-          <img src={track.artwork_url} alt="" className="w-10 h-10 rounded object-cover" />
+          <ArtworkImage src={track.artwork_url} className="w-10 h-10 rounded" />
         ) : (
           <div className="w-10 h-10 rounded bg-surface-3 flex items-center justify-center">
             <span className="text-white/20">♪</span>
@@ -96,7 +110,7 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
                   Add to queue
                 </MenuItem>
                 <div className="border-t border-white/5 my-1" />
-                <MenuItem onClick={() => { setShowEditor(true); setShowMenu(false) }}>
+                <MenuItem onClick={() => { openEditor(); setShowMenu(false) }}>
                   Edit track
                 </MenuItem>
                 {playlists.length > 0 && (
@@ -116,6 +130,15 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
                   </>
                 )}
                 <div className="border-t border-white/5 my-1" />
+                {isArchived ? (
+                  <MenuItem onClick={() => { unarchiveTrack(track.id); setShowMenu(false) }}>
+                    Unarchive
+                  </MenuItem>
+                ) : (
+                  <MenuItem onClick={() => { archiveTrack(track.id); setShowMenu(false) }}>
+                    Archive
+                  </MenuItem>
+                )}
                 {onRemove && (
                   <MenuItem onClick={() => { onRemove(); setShowMenu(false) }} danger>
                     Remove from playlist
@@ -133,8 +156,8 @@ export default function TrackRow({ track, index, onPlay, onRemove }: TrackRowPro
         </div>
       </div>
 
-      {showEditor && (
-        <TrackEditor track={track} onClose={() => setShowEditor(false)} />
+      {showFallbackEditor && (
+        <TrackEditor track={track} onClose={() => setShowFallbackEditor(false)} />
       )}
     </>
   )
