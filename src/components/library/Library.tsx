@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo, RefObject } from 'react'
 import { useLibraryStore } from '@/stores/libraryStore'
 import { usePlayerStore } from '@/stores/playerStore'
 import TrackRow from '@/components/ui/TrackRow'
 
-export default function Library() {
+interface LibraryProps {
+  searchRef: RefObject<HTMLInputElement | null>
+}
+
+export default function Library({ searchRef }: LibraryProps) {
   const tracks = useLibraryStore((s) => s.tracks)
   const searchQuery = useLibraryStore((s) => s.searchQuery)
   const setSearchQuery = useLibraryStore((s) => s.setSearchQuery)
@@ -28,6 +32,7 @@ export default function Library() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Library</h1>
         <input
+          ref={searchRef}
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

@@ -47,7 +47,7 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.osaka.app')
+  electronApp.setAppUserModelId('com.music.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

@@ -94,6 +94,11 @@ export default function PlayerBar({ onQueueClick }: PlayerBarProps) {
             value={progress}
             onChange={(e) => seek(parseFloat(e.target.value))}
             className="range-player flex-1"
+            style={{
+              background: duration
+                ? `linear-gradient(to right, #1db954 ${(progress / duration) * 100}%, #333 ${(progress / duration) * 100}%)`
+                : '#333'
+            }}
           />
           <span className="w-8 tabular-nums">{formatTime(duration)}</span>
         </div>

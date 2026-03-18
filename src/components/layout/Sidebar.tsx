@@ -19,6 +19,7 @@ export default function Sidebar({
   const deletePlaylist = useLibraryStore((s) => s.deletePlaylist)
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (newName.trim()) {
@@ -98,12 +99,23 @@ export default function Sidebar({
               >
                 {playlist.name}
               </button>
-              <button
-                onClick={() => deletePlaylist(playlist.id)}
-                className="text-white/0 group-hover:text-white/40 hover:!text-red-400 text-xs px-1 transition-colors no-drag"
-              >
-                ×
-              </button>
+              {confirmDeleteId === playlist.id ? (
+                <button
+                  onClick={() => { deletePlaylist(playlist.id); setConfirmDeleteId(null) }}
+                  onBlur={() => setConfirmDeleteId(null)}
+                  autoFocus
+                  className="text-red-400 text-[10px] px-1.5 py-0.5 bg-red-400/10 rounded transition-colors no-drag"
+                >
+                  delete?
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmDeleteId(playlist.id)}
+                  className="text-white/0 group-hover:text-white/40 hover:!text-red-400 text-xs px-1 transition-colors no-drag"
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>

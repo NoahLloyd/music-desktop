@@ -1,9 +1,16 @@
-import { spawn, execFile } from 'child_process'
+import { spawn, execFile, ExecFileOptions, SpawnOptions } from 'child_process'
 import { join } from 'path'
 import { app } from 'electron'
 import { tmpdir } from 'os'
 import { readFile, unlink, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
+
+// Packaged Electron apps don't inherit the user's shell PATH.
+// Ensure common tool locations are on PATH so yt-dlp can find ffmpeg, deno, etc.
+const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']
+const shellPath = (process.env.PATH || '').split(':')
+const fullPath = [...new Set([...extraPaths, ...shellPath])].join(':')
+const envWithPath = { ...process.env, PATH: fullPath }
 
 export interface DownloadResult {
   title: string
@@ -34,7 +41,7 @@ export async function getYtDlpPath(): Promise<string> {
   }
 
   return new Promise((resolve, reject) => {
-    execFile('/bin/sh', ['-c', 'which yt-dlp'], (error, stdout) => {
+    execFile('/bin/sh', ['-c', 'which yt-dlp'], { env: envWithPath }, (error, stdout) => {
       if (error) reject(new Error('yt-dlp not found. Install with: brew install yt-dlp'))
       else resolve(stdout.trim())
     })
@@ -46,7 +53,7 @@ export async function downloadAudio(
   onProgress: (progress: DownloadProgress) => void
 ): Promise<DownloadResult> {
   const ytDlpPath = await getYtDlpPath()
-  const tempBase = join(tmpdir(), `osaka-${Date.now()}`)
+  const tempBase = join(tmpdir(), `music-dl-${Date.now()}`)
   // Use %(ext)s so yt-dlp controls the extension
   const outputTemplate = `${tempBase}.%(ext)s`
 
@@ -67,7 +74,7 @@ export async function downloadAudio(
       '--newline',
       '--print', 'after_move:filepath',
       url
-    ])
+    ], { env: envWithPath })
 
     proc.stdout.on('data', (data: Buffer) => {
       const lines = data.toString().split('\n').filter(Boolean)
@@ -134,7 +141,7 @@ async function getMetadata(ytDlpPath: string, url: string): Promise<Record<strin
     execFile(
       ytDlpPath,
       ['--dump-json', '--no-download', '--no-playlist', url],
-      { maxBuffer: 10 * 1024 * 1024 },
+      { maxBuffer: 10 * 1024 * 1024, env: envWithPath },
       (error, stdout, stderr) => {
         if (error) return reject(new Error(`Metadata fetch failed: ${stderr || error.message}`))
         try {

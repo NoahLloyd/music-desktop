@@ -1,6 +1,7 @@
 {
-  "name": "osaka",
+  "name": "music",
   "version": "1.0.0",
+  "productName": "Music",
   "description": "Personal music player with YouTube downloading",
   "main": "./out/main/index.js",
   "scripts": {

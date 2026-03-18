@@ -43,15 +43,16 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Range input - player bar (subtle thumb) */
+/* Range input - player bar (colored fill, subtle thumb) */
 .range-player {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
-  background: #333;
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  /* Default background - overridden inline via JS for progress fill */
+  background: #333;
 }
 
 .range-player::-webkit-slider-thumb {
