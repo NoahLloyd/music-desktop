@@ -21,10 +21,18 @@ export default function App() {
   const fetchPlaylists = useLibraryStore((s) => s.fetchPlaylists)
   const searchRef = useRef<HTMLInputElement>(null)
 
+  const tracks = useLibraryStore((s) => s.tracks)
+  const setAllTracks = usePlayerStore((s) => s.setAllTracks)
+
   useEffect(() => {
     fetchTracks()
     fetchPlaylists()
   }, [])
+
+  // Keep player store in sync with library tracks for auto-pick
+  useEffect(() => {
+    setAllTracks(tracks)
+  }, [tracks])
 
   const handlePlaylistSelect = (id: string) => {
     setSelectedPlaylistId(id)
