@@ -8,8 +8,13 @@ interface PlayerState {
   progress: number
   duration: number
   volume: number
-  queue: Track[]
-  queueIndex: number
+
+  // Smart queue: manual queue > playlist source > auto-pick
+  manualQueue: Track[]
+  playlistSource: Track[]
+  playlistSourceIndex: number
+  playHistory: string[] // last 50 played track IDs
+  allTracks: Track[] // reference to all library tracks for auto-pick
 
   play: (track?: Track) => void
   pause: () => void
@@ -18,12 +23,38 @@ interface PlayerState {
   previous: () => void
   seek: (time: number) => void
   setVolume: (volume: number) => void
-  setQueue: (tracks: Track[], startIndex?: number) => void
   addToQueue: (track: Track) => void
   playNext: (track: Track) => void
   removeFromQueue: (index: number) => void
+  playPlaylist: (tracks: Track[], startIndex?: number) => void
+  setAllTracks: (tracks: Track[]) => void
   setProgress: (progress: number) => void
   setDuration: (duration: number) => void
+
+  // Legacy compat — maps to playPlaylist
+  setQueue: (tracks: Track[], startIndex?: number) => void
+}
+
+function addToHistory(history: string[], trackId: string): string[] {
+  const filtered = history.filter((id) => id !== trackId)
+  return [trackId, ...filtered].slice(0, 50)
+}
+
+function pickAutoTrack(allTracks: Track[], history: string[], currentId?: string): Track | null {
+  if (allTracks.length === 0) return null
+
+  const candidates = allTracks.filter((t) => t.id !== currentId)
+  if (candidates.length === 0) return allTracks[0]
+
+  // Score by recency in history — lower index = more recent = higher penalty
+  const scored = candidates.map((track) => {
+    const histIndex = history.indexOf(track.id)
+    const score = histIndex === -1 ? 100 : Math.min(histIndex, 50)
+    return { track, score: score + Math.random() * 10 }
+  })
+
+  scored.sort((a, b) => b.score - a.score)
+  return scored[0].track
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => {
@@ -164,16 +195,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     progress: 0,
     duration: 0,
     volume: 1,
-    queue: [],
-    queueIndex: -1,
+    manualQueue: [],
+    playlistSource: [],
+    playlistSourceIndex: 0,
+    playHistory: [],
+    allTracks: [],
 
     play: (track) => {
       if (track) {
-        const { queue } = get()
-        const index = queue.findIndex((t) => t.id === track.id)
-        if (index >= 0) {
-          set({ queueIndex: index })
-        }
+        const history = addToHistory(get().playHistory, track.id)
+        set({ playHistory: history })
         loadAndPlay(track)
       } else {
         get().resume()
@@ -191,11 +222,36 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     next: () => {
-      const { queue, queueIndex } = get()
-      if (queueIndex < queue.length - 1) {
-        const nextIndex = queueIndex + 1
-        set({ queueIndex: nextIndex })
-        loadAndPlay(queue[nextIndex])
+      const { manualQueue, playlistSource, playlistSourceIndex, allTracks, playHistory, currentTrack } = get()
+
+      // Priority 1: manual queue (user explicitly added)
+      if (manualQueue.length > 0) {
+        const [nextTrack, ...rest] = manualQueue
+        const history = addToHistory(playHistory, nextTrack.id)
+        set({ manualQueue: rest, playHistory: history })
+        loadAndPlay(nextTrack)
+        return
+      }
+
+      // Priority 2: playlist source (background playlist)
+      if (playlistSource.length > 0 && playlistSourceIndex < playlistSource.length) {
+        const nextTrack = playlistSource[playlistSourceIndex]
+        const history = addToHistory(playHistory, nextTrack.id)
+        set({ playlistSourceIndex: playlistSourceIndex + 1, playHistory: history })
+        loadAndPlay(nextTrack)
+        return
+      }
+
+      // Priority 3: auto-pick from library (weighted random, avoids recently played)
+      const autoTrack = pickAutoTrack(allTracks, playHistory, currentTrack?.id)
+      if (autoTrack) {
+        const history = addToHistory(playHistory, autoTrack.id)
+        set({
+          playHistory: history,
+          playlistSource: [],
+          playlistSourceIndex: 0,
+        })
+        loadAndPlay(autoTrack)
       } else {
         audioElement?.pause()
         set({ isPlaying: false })
@@ -203,19 +259,29 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     previous: () => {
-      const { queue, queueIndex, currentTrack } = get()
+      const { progress, currentTrack, playHistory, allTracks } = get()
       const audio = getOrCreateAudio()
       const startTime = currentTrack?.start_time || 0
-      // If more than 3 seconds past start, restart the track
-      if (audio.currentTime - startTime > 3) {
+
+      // If more than 3 seconds in, restart current track
+      if (progress > 3) {
         audio.currentTime = startTime
         return
       }
-      if (queueIndex > 0) {
-        const prevIndex = queueIndex - 1
-        set({ queueIndex: prevIndex })
-        loadAndPlay(queue[prevIndex])
+
+      // Go to actual previous track from play history
+      if (playHistory.length > 1) {
+        const prevId = playHistory[1]
+        const prevTrack = allTracks.find((t) => t.id === prevId)
+        if (prevTrack) {
+          set({ isPlaying: true })
+          loadAndPlay(prevTrack)
+          return
+        }
       }
+
+      // Fallback: restart current
+      audio.currentTime = startTime
     },
 
     seek: (time) => {
@@ -232,35 +298,41 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       set({ volume })
     },
 
-    setQueue: (tracks, startIndex = 0) => {
-      set({ queue: tracks, queueIndex: startIndex })
-      if (tracks.length > 0) {
-        loadAndPlay(tracks[startIndex])
-      }
-    },
-
     addToQueue: (track) => {
-      set((state) => ({ queue: [...state.queue, track] }))
+      set((state) => ({ manualQueue: [...state.manualQueue, track] }))
     },
 
     playNext: (track) => {
-      set((state) => {
-        const newQueue = [...state.queue]
-        newQueue.splice(state.queueIndex + 1, 0, track)
-        return { queue: newQueue }
-      })
+      set((state) => ({ manualQueue: [track, ...state.manualQueue] }))
     },
 
     removeFromQueue: (index) => {
       set((state) => {
-        const newQueue = [...state.queue]
+        const newQueue = [...state.manualQueue]
         newQueue.splice(index, 1)
-        const newIndex = index < state.queueIndex ? state.queueIndex - 1 : state.queueIndex
-        return { queue: newQueue, queueIndex: newIndex }
+        return { manualQueue: newQueue }
       })
     },
 
+    playPlaylist: (tracks, startIndex = 0) => {
+      if (tracks.length === 0) return
+      const track = tracks[startIndex]
+      const history = addToHistory(get().playHistory, track.id)
+      set({
+        playlistSource: tracks,
+        playlistSourceIndex: startIndex + 1,
+        playHistory: history,
+      })
+      loadAndPlay(track)
+    },
+
+    // Legacy compat — setQueue now maps to playPlaylist
+    setQueue: (tracks, startIndex = 0) => {
+      get().playPlaylist(tracks, startIndex)
+    },
+
+    setAllTracks: (tracks) => set({ allTracks: tracks }),
     setProgress: (progress) => set({ progress }),
-    setDuration: (duration) => set({ duration })
+    setDuration: (duration) => set({ duration }),
   }
 })
