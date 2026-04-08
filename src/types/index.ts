@@ -15,6 +15,8 @@ export interface Track {
   fade_in: number | null
   fade_out: number | null
   key: string | null
+  processed_storage_path: string | null
+  loudness_db: number | null
   archived_at: string | null
   created_at: string
 }

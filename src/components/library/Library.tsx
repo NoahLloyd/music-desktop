@@ -3,6 +3,7 @@ import { useLibraryStore } from '@/stores/libraryStore'
 import { usePlayerStore } from '@/stores/playerStore'
 import TrackRow from '@/components/ui/TrackRow'
 import TrackEditor from '@/components/ui/TrackEditor'
+import VolumeNormalizer from '@/components/ui/VolumeNormalizer'
 
 interface LibraryProps {
   searchRef: RefObject<HTMLInputElement | null>
@@ -18,6 +19,7 @@ export default function Library({ searchRef }: LibraryProps) {
 
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null)
+  const [showNormalizer, setShowNormalizer] = useState(false)
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return tracks
@@ -102,14 +104,24 @@ export default function Library({ searchRef }: LibraryProps) {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Library</h1>
-        <input
-          ref={searchRef}
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search tracks..."
-          className="bg-surface-2 text-white text-sm rounded-full px-4 py-2 w-64 outline-none focus:ring-1 focus:ring-accent placeholder:text-white/30"
-        />
+        <div className="flex items-center gap-3">
+          {tracks.length > 0 && (
+            <button
+              onClick={() => setShowNormalizer(true)}
+              className="bg-surface-2 hover:bg-surface-3 text-white/50 hover:text-white text-[12px] px-3 py-2 rounded-full transition-colors"
+            >
+              Normalize Volume
+            </button>
+          )}
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search tracks..."
+            className="bg-surface-2 text-white text-sm rounded-full px-4 py-2 w-64 outline-none focus:ring-1 focus:ring-accent placeholder:text-white/30"
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -138,6 +150,13 @@ export default function Library({ searchRef }: LibraryProps) {
         <TrackEditor
           track={filtered.find((t) => t.id === editingTrackId) || tracks.find((t) => t.id === editingTrackId)!}
           onClose={() => setEditingTrackId(null)}
+        />
+      )}
+
+      {showNormalizer && (
+        <VolumeNormalizer
+          tracks={tracks}
+          onClose={() => setShowNormalizer(false)}
         />
       )}
     </div>

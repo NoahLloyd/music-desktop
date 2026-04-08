@@ -188,19 +188,30 @@ export default function TrackEditor({ track, onClose }: TrackEditorProps) {
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [processing, setProcessing] = useState(false)
+
+  // Check if any audio adjustments have been made that need baking
+  const hasAudioAdjustments =
+    startTime > 0 ||
+    endTime < duration ||
+    Math.abs(dbToLinear(volumeDb) - 1) > 0.01 ||
+    fadeIn > 0 ||
+    fadeOut > 0 ||
+    Math.abs(playbackSpeed - 1) > 0.01
 
   const handleSave = async () => {
     setSaving(true)
     setSaveError(null)
     try {
       const bpmVal = parseFloat(bpmOverride) || detectedBpm
+      const volumeLinear = Math.round(dbToLinear(volumeDb) * 1000) / 1000
       await updateTrack(track.id, {
         title: title.trim() || track.title,
         artist: artist.trim() || null,
         artwork_url: artworkUrl.trim() || null,
         start_time: startTime > 0 ? startTime : null,
         end_time: endTime < duration ? endTime : null,
-        volume: Math.round(dbToLinear(volumeDb) * 1000) / 1000,
+        volume: volumeLinear,
         bpm: bpmVal || null,
         playback_speed: playbackSpeed !== 1 ? playbackSpeed : null,
         preserve_pitch: preservePitch,
@@ -208,6 +219,34 @@ export default function TrackEditor({ track, onClose }: TrackEditorProps) {
         fade_out: fadeOut > 0 ? fadeOut : null,
         key: detectedKey || null
       })
+
+      // Bake audio adjustments into a processed file if any adjustments exist
+      if (hasAudioAdjustments) {
+        setProcessing(true)
+        try {
+          const result = await window.api.processAudio(track.id, {
+            startTime: startTime > 0 ? startTime : null,
+            endTime: endTime < duration ? endTime : null,
+            volume: volumeLinear,
+            fadeIn: fadeIn > 0 ? fadeIn : null,
+            fadeOut: fadeOut > 0 ? fadeOut : null,
+            playbackSpeed: playbackSpeed !== 1 ? playbackSpeed : null,
+            preservePitch
+          })
+          if (result.success) {
+            await updateTrack(track.id, {
+              processed_storage_path: result.processedStoragePath
+            })
+          } else {
+            console.warn('Audio processing failed (track saved without baking):', result.error)
+          }
+        } catch (err) {
+          console.warn('Audio processing failed (track saved without baking):', err)
+        } finally {
+          setProcessing(false)
+        }
+      }
+
       onClose()
     } catch (err: any) {
       console.error('Save failed:', err)
@@ -614,10 +653,10 @@ export default function TrackEditor({ track, onClose }: TrackEditorProps) {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || processing}
             className="bg-accent hover:bg-accent-hover text-black font-semibold text-[13px] px-6 py-2 rounded-lg transition-colors disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Save'}
+            {processing ? 'Baking audio...' : saving ? 'Saving...' : hasAudioAdjustments ? 'Save & Bake' : 'Save'}
           </button>
         </div>
       </div>

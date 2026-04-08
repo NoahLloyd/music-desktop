@@ -10,6 +10,8 @@ export interface Track {
   artwork_url: string | null
   start_time: number | null
   end_time: number | null
+  processed_storage_path: string | null
+  loudness_db: number | null
   created_at: string
 }
 
