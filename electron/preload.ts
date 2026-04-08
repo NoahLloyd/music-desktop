@@ -35,7 +35,37 @@ const api = {
   // Get cache directory
   getCacheDir: () => ipcRenderer.invoke('get-cache-dir'),
   // Get real file path from a dropped File object
-  getPathForFile: (file: File) => webUtils.getPathForFile(file)
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  // Process audio: bake adjustments into a separate file
+  processAudio: (trackId: string, options: {
+    startTime: number | null
+    endTime: number | null
+    volume: number | null
+    fadeIn: number | null
+    fadeOut: number | null
+    playbackSpeed: number | null
+    preservePitch: boolean
+  }) => ipcRenderer.invoke('process-audio', trackId, options),
+  // Process progress events
+  onProcessProgress: (callback: (progress: { trackId: string; stage: string; message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: any) => callback(progress)
+    ipcRenderer.on('process-progress', handler)
+    return () => ipcRenderer.removeListener('process-progress', handler)
+  },
+  // Measure loudness of a cached track
+  measureLoudness: (trackId: string) => ipcRenderer.invoke('measure-loudness', trackId),
+  // Normalize a track to target loudness, preserving existing edits
+  normalizeTrack: (trackId: string, currentLoudnessDb: number, targetLoudnessDb: number, trackAdjustments: {
+    startTime: number | null
+    endTime: number | null
+    volume: number | null
+    fadeIn: number | null
+    fadeOut: number | null
+    playbackSpeed: number | null
+    preservePitch: boolean
+  }) => ipcRenderer.invoke('normalize-track', trackId, currentLoudnessDb, targetLoudnessDb, trackAdjustments),
+  // Get processed cache path
+  getProcessedCachePath: (trackId: string) => ipcRenderer.invoke('get-processed-cache-path', trackId)
 }
 
 if (process.contextIsolated) {

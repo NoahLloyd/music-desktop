@@ -66,6 +66,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       audioElement.addEventListener('timeupdate', () => {
         const track = get().currentTrack
         const currentTime = audioElement!.currentTime
+
+        // When using processed file, all adjustments are baked in - just report progress
+        if (usingProcessedFile) {
+          set({ progress: currentTime })
+          return
+        }
+
         // Respect end_time trim point
         if (track?.end_time && currentTime >= track.end_time) {
           get().next()
@@ -89,12 +96,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       })
       audioElement.addEventListener('loadedmetadata', () => {
         const track = get().currentTrack
-        const startOffset = track?.start_time ?? 0
-        const effectiveEnd = track?.end_time || audioElement!.duration
-        set({ duration: effectiveEnd - startOffset })
-        // Seek to start_time if set
-        if (track?.start_time && audioElement!.currentTime < track.start_time) {
-          audioElement!.currentTime = track.start_time
+        if (usingProcessedFile) {
+          // Processed file: full duration, no offsets
+          set({ duration: audioElement!.duration })
+        } else {
+          const startOffset = track?.start_time ?? 0
+          const effectiveEnd = track?.end_time || audioElement!.duration
+          set({ duration: effectiveEnd - startOffset })
+          if (track?.start_time && audioElement!.currentTime < track.start_time) {
+            audioElement!.currentTime = track.start_time
+          }
         }
       })
       audioElement.addEventListener('ended', () => {
@@ -148,34 +159,76 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     }, stepDuration)
   }
 
+  // Track whether current playback is using a processed (baked) file
+  let usingProcessedFile = false
+
   async function loadAndPlay(track: Track): Promise<void> {
     const audio = getOrCreateAudio()
     if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null }
     set({ currentTrack: track, isPlaying: false })
+    usingProcessedFile = false
 
-    try {
-      const cachePath = await window.api.getCachePath(track.id)
-      audio.src = `file://${cachePath}`
-      await audio.play().catch(async () => {
-        // Cache miss - load from Supabase
+    // Try processed file first (has all adjustments baked in)
+    let loaded = false
+    if (track.processed_storage_path) {
+      try {
+        const processedPath = await window.api.getProcessedCachePath(track.id)
+        if (processedPath) {
+          audio.src = `file://${processedPath}`
+          await audio.play()
+          usingProcessedFile = true
+          loaded = true
+        }
+      } catch {
+        // Fall through to original file
+      }
+
+      if (!loaded) {
+        // Try loading processed file from Supabase
+        try {
+          const url = await getAudioUrl(track.processed_storage_path)
+          audio.src = url
+          await audio.play()
+          usingProcessedFile = true
+          loaded = true
+        } catch {
+          // Fall through to original file
+        }
+      }
+    }
+
+    // Fall back to original file
+    if (!loaded) {
+      try {
+        const cachePath = await window.api.getCachePath(track.id)
+        audio.src = `file://${cachePath}`
+        await audio.play().catch(async () => {
+          const url = await getAudioUrl(track.storage_path)
+          audio.src = url
+          await audio.play()
+        })
+      } catch {
         const url = await getAudioUrl(track.storage_path)
         audio.src = url
         await audio.play()
-      })
-    } catch {
-      const url = await getAudioUrl(track.storage_path)
-      audio.src = url
-      await audio.play()
+      }
+
+      // Seek to start_time if set (only for unprocessed files)
+      if (track.start_time) {
+        audio.currentTime = track.start_time
+      }
+
+      // Apply per-track settings (only for unprocessed files)
+      applyTrackSettings(track)
+      startFadeIn(track)
     }
 
-    // Seek to start_time if set
-    if (track.start_time) {
-      audio.currentTime = track.start_time
+    // For processed files, only apply global volume (adjustments are baked in)
+    if (usingProcessedFile) {
+      audio.volume = get().volume
+      audio.playbackRate = 1
+      ;(audio as any).preservesPitch = true
     }
-
-    // Apply per-track settings
-    applyTrackSettings(track)
-    startFadeIn(track)
 
     set({ isPlaying: true })
 
@@ -286,15 +339,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     seek: (time) => {
       if (audioElement) {
-        const startOffset = get().currentTrack?.start_time ?? 0
-        audioElement.currentTime = time + startOffset
+        if (usingProcessedFile) {
+          audioElement.currentTime = time
+        } else {
+          const startOffset = get().currentTrack?.start_time ?? 0
+          audioElement.currentTime = time + startOffset
+        }
       }
     },
 
     setVolume: (volume) => {
-      const track = get().currentTrack
-      const trackVolume = track?.volume ?? 1
-      if (audioElement) audioElement.volume = volume * Math.min(trackVolume, 2)
+      if (usingProcessedFile) {
+        // Processed file: only apply global volume (track volume is baked in)
+        if (audioElement) audioElement.volume = volume
+      } else {
+        const track = get().currentTrack
+        const trackVolume = track?.volume ?? 1
+        if (audioElement) audioElement.volume = volume * Math.min(trackVolume, 2)
+      }
       set({ volume })
     },
 
